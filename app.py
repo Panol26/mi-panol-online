@@ -1,69 +1,51 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
-from datetime import datetime
+import pandas as pd
 
-# 1. CONEXIÓN A LA NUBE
-st.set_page_config(page_title="Pañol Profesional", layout="wide")
+st.set_page_config(page_title="Pañol Online", layout="wide")
 
-# Reemplaza esto con tus datos de Supabase
-URL = "https://ohhjevkgpfigsriadvmj.supabase.co"
-KEY = "sb_publishable_N5ziFS4ShJI9GlaRrORfBA_kQWavEVp"
+# Conexión automática usando los Secrets que pusiste
+conn = st.connection("supabase", type=SupabaseConnection)
 
-conn = st.connection("supabase", type=SupabaseConnection, url=URL, key=KEY)
+st.title("🛠️ Sistema de Pañol Profesional")
 
-# --- ESTILOS ---
-st.markdown("""
-    <style>
-    .main { background-color: #ffffff; }
-    .stAlert { border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- NAVEGACIÓN ---
+menu = st.sidebar.selectbox("Seleccionar Sección:", ["📦 Inventario", "👥 Empleados", "📋 Préstamos"])
 
-st.sidebar.title("🛠️ Menú de Control")
-menu = st.sidebar.radio("Ir a:", ["Dashboard", "Inventario", "Préstamos", "Empleados"])
-
-# --- FUNCIONES DE BASE DE DATOS ---
-def obtener_datos(tabla):
-    return conn.table(tabla).select("*").execute()
-
-def insertar_dato(tabla, dato):
-    conn.table(tabla).insert(dato).execute()
-    st.rerun()
-
-# --- SECCIONES ---
-if menu == "Dashboard":
-    st.header("📊 Tablero de Alertas")
-    res = obtener_datos("inventario")
-    if res.data:
-        for item in res.data:
-            if item['stock'] <= item['minimo']:
-                st.error(f"🚨 REPOSICIÓN: {item['item']} | Stock actual: {item['stock']} (Mínimo: {item['minimo']})")
-    else:
-        st.info("No hay datos cargados aún.")
-
-elif menu == "Inventario":
-    st.header("📦 Gestión de Stock")
+# --- SECCIÓN INVENTARIO ---
+if menu == "📦 Inventario":
+    st.header("Control de Stock")
     
-    # Formulario para agregar
-    with st.expander("➕ Cargar Nuevo Artículo"):
-        n = st.text_input("Nombre")
-        s = st.number_input("Stock Inicial", min_value=0)
-        m = st.number_input("Alerta cuando queden:", min_value=1)
-        if st.button("Guardar"):
-            insertar_dato("inventario", {"item": n, "stock": s, "minimo": m})
+    # Formulario para agregar items
+    with st.expander("➕ Agregar Nuevo Item al Stock"):
+        with st.form("nuevo_item"):
+            nombre = st.text_input("Nombre de la herramienta")
+            cantidad = st.number_input("Stock inicial", min_value=0)
+            alerta = st.number_input("Mínimo para alerta roja", min_value=1)
+            botón = st.form_submit_button("Registrar en Base de Datos")
+            
+            if botón:
+                conn.table("inventario").insert({"item": nombre, "stock": cantidad, "minimo": alerta}).execute()
+                st.success("¡Guardado correctamente!")
+                st.rerun()
 
-    # Mostrar tabla
-    res = obtener_datos("inventario")
+    # Mostrar Tabla y Alertas Rojas
+    res = conn.table("inventario").select("*").execute()
     if res.data:
-        st.table(res.data)
+        df = pd.DataFrame(res.data)
+        
+        # Alertas visuales
+        for index, row in df.iterrows():
+            if row['stock'] <= row['minimo']:
+                st.error(f"⚠️ REPOSICIÓN URGENTE: {row['item']} (Quedan {row['stock']})")
+        
+        st.dataframe(df, use_container_width=True)
 
-elif menu == "Préstamos":
-    st.header("📋 Seguimiento de Préstamos")
-    # Aquí puedes hacer la lógica de tiempo
-    st.write("Registra aquí quién se lleva las herramientas.")
-    # (Similar a la versión anterior pero usando insertar_dato("prestamos", ...))
-
-elif menu == "Empleados":
-    st.header("👥 Personal")
-    res_e = obtener_datos("empleados")
-    # Mostrar y agregar empleados
+# --- SECCIÓN EMPLEADOS ---
+elif menu == "👥 Empleados":
+    st.header("Registro de Personal")
+    with st.form("nuevo_emp"):
+        nombre_emp = st.text_input("Nombre Completo")
+        if st.form_submit_button("Agregar Empleado"):
+            conn.table("empleados").insert({"nombre": nombre_emp}).execute()
+            st.success("Empleado registrado")
