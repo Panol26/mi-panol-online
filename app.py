@@ -1,6 +1,5 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
-import pandas as pd
 
 st.set_page_config(page_title="Pañol Online", layout="wide")
 
@@ -49,3 +48,4 @@ elif menu == "👥 Empleados":
         if st.form_submit_button("Agregar Empleado"):
             conn.table("empleados").insert({"nombre": nombre_emp}).execute()
             st.success("Empleado registrado")
+
